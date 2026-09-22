@@ -7,13 +7,17 @@
 # The iOS klibs build on Linux: `kotlin.native.enableKlibsCrossCompilation` is set in
 # gradle.properties, which is how upstream publishes Apple targets from an Ubuntu runner too.
 name: Publish to GitHub Packages
+# Deliberately manual. A `push` trigger on Versions.kt was tried and removed: the commit that
+# added this workflow also changed that file, so pushing it published on its own, and a manual
+# run started alongside raced it. A released version in GitHub Packages cannot be overwritten, so
+# the second uploader gets a 409 and can leave a version half-written. Publishing is rare enough
+# that a deliberate click costs nothing.
 on:
   workflow_dispatch:
-  push:
-    branches: [twinlives]
-    # Artifact versions come from Versions.kt, so a change there is the only push worth acting on
-    # — whether we bumped TWINLIVES or a merge from master brought a new upstream VICO.
-    paths: ['buildSrc/src/main/kotlin/Versions.kt']
+# Belt and braces: never let two publishes overlap, whatever starts them.
+concurrency:
+  group: publish-twinlives
+  cancel-in-progress: false
 jobs:
   publish:
     runs-on: ubuntu-latest
