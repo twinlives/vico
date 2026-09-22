@@ -1,0 +1,41 @@
+# Publishes this fork's `vico:compose` to the repository's own GitHub Packages Maven registry.
+#
+# Upstream's `publish.yml` handles Maven Central releases and is inert here — it is guarded on
+# `github.repository == 'patrykandpatrick/vico'`. This workflow is the fork's equivalent and
+# carries the mirror-image guard, so it stays inert in any fork of the fork.
+#
+# The iOS klibs build on Linux: `kotlin.native.enableKlibsCrossCompilation` is set in
+# gradle.properties, which is how upstream publishes Apple targets from an Ubuntu runner too.
+name: Publish to GitHub Packages
+on:
+  workflow_dispatch:
+  push:
+    branches: [twinlives]
+    # Artifact versions come from Versions.kt, so a change there is the only push worth acting on
+    # — whether we bumped TWINLIVES or a merge from master brought a new upstream VICO.
+    paths: ['buildSrc/src/main/kotlin/Versions.kt']
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.repository == 'twinlives/vico'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Report the version being published
+        run: |
+          VICO=$(grep -oP '(?<=const val VICO = ")[^"]*' buildSrc/src/main/kotlin/Versions.kt)
+          TWINLIVES=$(grep -oP '(?<=const val TWINLIVES = ")[^"]*' buildSrc/src/main/kotlin/Versions.kt)
+          echo "Publishing com.twinlives.vico:compose:$VICO-$TWINLIVES" >> "$GITHUB_STEP_SUMMARY"
+      # GitHub Packages rejects overwriting a released version, so a re-run without a version bump
+      # fails here rather than silently doing nothing.
+      - run: ./gradlew :vico:compose:publishAllPublicationsToGitHubPackagesRepository
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

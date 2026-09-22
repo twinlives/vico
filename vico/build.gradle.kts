@@ -19,8 +19,8 @@ import java.time.Year
 plugins { `dokka-convention` }
 
 subprojects {
-  group = "com.patrykandpatrick.vico"
-  version = Versions.VICO
+  group = "com.twinlives.vico"
+  version = "${Versions.VICO}-${Versions.TWINLIVES}"
 }
 
 dependencies {

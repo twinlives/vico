@@ -18,4 +18,11 @@ object Versions {
   const val COMPILE_SDK = 37
   const val MIN_SDK = 23
   const val VICO = "3.3.1"
+
+  /**
+   * This fork’s revision of [VICO], in the manner of KSP’s versioning: the artifact version is
+   * `"$VICO-$TWINLIVES"`, so it always names the upstream release it is built from. [VICO] is
+   * upstream’s and arrives by merge; bump this one, and only this one, for our own releases.
+   */
+  const val TWINLIVES = "1.0.0"
 }
