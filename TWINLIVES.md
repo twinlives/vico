@@ -94,8 +94,10 @@ GitHub Packages requires credentials even for a public package. One-time, per ma
 gh auth refresh -s read:packages
 ```
 
-oraahi's `settings.gradle.kts` then finds a token from, in order: the `gpr.token` Gradle property,
-`GITHUB_TOKEN` (how CI supplies it), or `gh auth token`. Nothing needs to be written to disk.
+oraahi's `settings.gradle.kts` then finds a token from, in order: `github.packages_read_token`
+in its `secret.properties`, the `GITHUB_TOKEN` environment variable (how CI supplies it), then
+`gh auth token`. The last means the command above is usually all a developer needs; the
+`secret.properties` key is there for machines that would rather not depend on the CLI.
 
 In CI, the job needs `permissions: { contents: read, packages: read }`. Listing any permission
 makes the token restrictive, so `contents` must be named alongside `packages` or checkout loses its
