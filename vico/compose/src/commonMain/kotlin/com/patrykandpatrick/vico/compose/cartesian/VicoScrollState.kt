@@ -61,6 +61,7 @@ public class VicoScrollState {
   internal val consumedXDeltas = MutableSharedFlow<Float>(extraBufferCapacity = 1)
   internal val unconsumedXDeltas = MutableSharedFlow<Float>(extraBufferCapacity = 1)
   private var previousScrollLayout: ScrollLayout? = null
+  private val _visibleXRange = mutableStateOf<ClosedFloatingPointRange<Double>?>(null)
 
   internal val scrollableState = ScrollableState { delta ->
     val oldValue = value
@@ -83,6 +84,19 @@ public class VicoScrollState {
       val oldValue = value
       _value.floatValue = newValue.coerceIn(0f.rangeWith(maxValue))
       if (value != oldValue) consumedXDeltas.tryEmit(oldValue - value)
+    }
+
+  /**
+   * The _x_ range currently in view, or `null` before the chart has been laid out.
+   *
+   * Reading this in a composable causes that composable to recompose when the visible range
+   * changes — which is to say when the chart is scrolled or zoomed, or when the model's _x_ range
+   * changes beneath it. Use it to summarize, or to load, only what is on screen.
+   */
+  public var visibleXRange: ClosedFloatingPointRange<Double>?
+    get() = _visibleXRange.value
+    private set(newValue) {
+      _visibleXRange.value = newValue
     }
 
   /** The maximum scroll value (in pixels). */
@@ -204,6 +218,10 @@ public class VicoScrollState {
         startPadding = layerDimensions.startPadding,
         layoutDirectionMultiplier = context.layoutDirectionMultiplier,
       )
+    // Last, because it reads `value`, which the repositioning above can still move. Assigning an
+    // equal range is a no-op for snapshot state, so a chart that is not moving does not invalidate
+    // its readers frame after frame.
+    visibleXRange = context.getVisibleXRange(layerDimensions, bounds, value)
   }
 
   internal suspend fun autoScroll(model: CartesianChartModel, oldModel: CartesianChartModel?) {
