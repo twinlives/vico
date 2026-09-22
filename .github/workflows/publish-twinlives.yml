@@ -32,14 +32,44 @@ jobs:
           distribution: zulu
           java-version: 17
       - uses: gradle/actions/setup-gradle@v6
-      - name: Report the version being published
+      # Fail in seconds rather than after a five-minute build. A released version cannot be
+      # overwritten, so re-running without bumping TWINLIVES can only end in 409.
+      - name: Resolve the version and check it is free
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VICO=$(grep -oP '(?<=const val VICO = ")[^"]*' buildSrc/src/main/kotlin/Versions.kt)
           TWINLIVES=$(grep -oP '(?<=const val TWINLIVES = ")[^"]*' buildSrc/src/main/kotlin/Versions.kt)
-          echo "Publishing com.twinlives.vico:compose:$VICO-$TWINLIVES" >> "$GITHUB_STEP_SUMMARY"
-      # GitHub Packages rejects overwriting a released version, so a re-run without a version bump
-      # fails here rather than silently doing nothing.
+          VERSION="$VICO-$TWINLIVES"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Publishing com.twinlives.vico:compose:$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          BASE=https://maven.pkg.github.com/twinlives/vico/com/twinlives/vico
+          code=$(curl -s -o /dev/null -w '%{http_code}' -u "x:$GITHUB_TOKEN" \
+            "$BASE/compose/$VERSION/compose-$VERSION.module")
+          if [ "$code" = "200" ]; then
+            echo "::error::$VERSION is already published. Bump TWINLIVES in Versions.kt."
+            exit 1
+          fi
+
       - run: ./gradlew :vico:compose:publishAllPublicationsToGitHubPackagesRepository
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # A partially published version is the bad outcome: it resolves on one platform and fails
+      # at link time on another. Every target gets a `.module`, so checking those proves the set
+      # is whole.
+      - name: Verify every target variant landed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE=https://maven.pkg.github.com/twinlives/vico/com/twinlives/vico
+          missing=0
+          for a in compose compose-android compose-iosarm64 compose-iossimulatorarm64 \
+                   compose-desktop compose-js compose-wasm-js; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -u "x:$GITHUB_TOKEN" \
+              "$BASE/$a/$VERSION/$a-$VERSION.module")
+            echo "  $a: HTTP $code" >> "$GITHUB_STEP_SUMMARY"
+            [ "$code" = "200" ] || { echo "::error::$a is missing from $VERSION"; missing=1; }
+          done
+          exit $missing
