@@ -82,6 +82,7 @@ internal fun narrowMarkerTargets(
  *   legend, the marker, and other components are added. Used only when the height isn’t otherwise
  *   constrained (e.g., via [Modifier.height]).
  * @param placeholder shown when no [CartesianChartModel] is available.
+ * @param onVisibleXRangeChange called with the _x_ range currently in view whenever it changes.
  */
 @Composable
 public fun CartesianChartHost(
@@ -93,6 +94,7 @@ public fun CartesianChartHost(
   animationSpec: AnimationSpec<Float>? = defaultCartesianDiffAnimationSpec,
   initialAnimationSpec: AnimationSpec<Float>? = animationSpec,
   chartAreaHeight: Dp = Defaults.CARTESIAN_CHART_AREA_HEIGHT.dp,
+  onVisibleXRangeChange: ((ClosedFloatingPointRange<Double>) -> Unit)? = null,
   placeholder: @Composable BoxScope.() -> Unit = {},
 ) {
   val mutableRanges = remember { MutableCartesianChartRanges() }
@@ -111,6 +113,7 @@ public fun CartesianChartHost(
       chartAreaHeight,
       previousModel,
       extraStore,
+      onVisibleXRangeChange,
     )
   } else {
     ChartHostBox(modifier, chartAreaHeight, measureExtras = null) { placeholder() }
@@ -146,6 +149,7 @@ public fun CartesianChartHost(
   animationSpec: AnimationSpec<Float>? = defaultCartesianDiffAnimationSpec,
   animateIn: Boolean,
   chartAreaHeight: Dp = Defaults.CARTESIAN_CHART_AREA_HEIGHT.dp,
+  onVisibleXRangeChange: ((ClosedFloatingPointRange<Double>) -> Unit)? = null,
   placeholder: @Composable BoxScope.() -> Unit = {},
 ) {
   CartesianChartHost(
@@ -157,6 +161,7 @@ public fun CartesianChartHost(
     animationSpec = animationSpec,
     initialAnimationSpec = if (animateIn) animationSpec else null,
     chartAreaHeight = chartAreaHeight,
+    onVisibleXRangeChange = onVisibleXRangeChange,
     placeholder = placeholder,
   )
 }
@@ -175,6 +180,7 @@ public fun CartesianChartHost(
  * @param chartAreaHeight the default height of the coordinate system, to which the heights of the
  *   legend, the marker, and other components are added. Used only when the height isn’t otherwise
  *   constrained (e.g., via [Modifier.height]).
+ * @param onVisibleXRangeChange called with the _x_ range currently in view whenever it changes.
  */
 @Composable
 public fun CartesianChartHost(
@@ -184,6 +190,7 @@ public fun CartesianChartHost(
   scrollState: VicoScrollState = rememberVicoScrollState(),
   zoomState: VicoZoomState = rememberDefaultVicoZoomState(scrollState.scrollEnabled),
   chartAreaHeight: Dp = Defaults.CARTESIAN_CHART_AREA_HEIGHT.dp,
+  onVisibleXRangeChange: ((ClosedFloatingPointRange<Double>) -> Unit)? = null,
 ) {
   val ranges = remember { MutableCartesianChartRanges() }
   remember(chart, model) {
@@ -198,6 +205,7 @@ public fun CartesianChartHost(
     zoomState,
     ranges.toImmutable(),
     chartAreaHeight,
+    onVisibleXRangeChange = onVisibleXRangeChange,
   )
 }
 
@@ -212,6 +220,7 @@ internal fun CartesianChartHostImpl(
   chartAreaHeight: Dp,
   previousModel: CartesianChartModel? = null,
   extraStore: ExtraStore = ExtraStore.Empty,
+  onVisibleXRangeChange: ((ClosedFloatingPointRange<Double>) -> Unit)? = null,
 ) {
   var markerX by rememberSaveable { mutableStateOf<Double?>(null) }
   var markerSeriesIndex by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -232,6 +241,7 @@ internal fun CartesianChartHostImpl(
 
   val coroutineScope = rememberCoroutineScope()
   var lastHandledModel by remember { ValueWrapper(model) }
+  var lastVisibleXRange by remember { mutableStateOf<ClosedFloatingPointRange<Double>?>(null) }
   val layerDimensions = remember { MutableCartesianLayerDimensions() }
   val measureLayerDimensions = remember { MutableCartesianLayerDimensions() }
   val measureExtras =
@@ -352,6 +362,19 @@ internal fun CartesianChartHostImpl(
 
       zoomState.update(measuringContext.value, layerDimensions, chart.layerBounds)
       scrollState.update(measuringContext.value, chart.layerBounds, layerDimensions)
+
+      if (onVisibleXRangeChange != null) {
+        val visibleXRange =
+          measuringContext.value.getVisibleXRange(
+            layerDimensions,
+            chart.layerBounds,
+            scrollState.value,
+          )
+        if (visibleXRange != lastVisibleXRange) {
+          lastVisibleXRange = visibleXRange
+          onVisibleXRangeChange(visibleXRange)
+        }
+      }
 
       if (model != lastHandledModel) {
         coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
