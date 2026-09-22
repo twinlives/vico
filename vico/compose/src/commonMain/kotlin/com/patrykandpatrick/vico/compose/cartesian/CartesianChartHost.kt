@@ -281,12 +281,18 @@ internal fun CartesianChartHostImpl(
           if (chart.markerController.shouldAcceptInteraction(interaction, narrowedTargets)) {
             val shouldShow = chart.markerController.shouldShowMarker(interaction, narrowedTargets)
             lastAcceptedInteraction = interaction
-            if (shouldShow && narrowedTargets.isNotEmpty()) {
-              markerX = narrowedTargets.first().x
-              markerSeriesIndex = seriesIndex
-            } else {
-              markerX = null
-              markerSeriesIndex = null
+            when {
+              shouldShow && narrowedTargets.isNotEmpty() -> {
+                markerX = narrowedTargets.first().x
+                markerSeriesIndex = seriesIndex
+              }
+              // Sparse data can leave a drag briefly over no target at all. Keeping the last
+              // marker is better than blinking it out and back for a single frame.
+              shouldShow && interaction is Interaction.Move -> Unit
+              else -> {
+                markerX = null
+                markerSeriesIndex = null
+              }
             }
             true
           } else {
