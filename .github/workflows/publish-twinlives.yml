@@ -44,7 +44,9 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Publishing com.twinlives.vico:compose:$VERSION" >> "$GITHUB_STEP_SUMMARY"
           BASE=https://maven.pkg.github.com/twinlives/vico/com/twinlives/vico
-          code=$(curl -s -o /dev/null -w '%{http_code}' -u "x:$GITHUB_TOKEN" \
+          # -L matters: the registry answers 302 and redirects to blob storage, so an
+          # unfollowed probe reports 302 for a file that is very much there.
+          code=$(curl -sL -o /dev/null -w '%{http_code}' -u "x:$GITHUB_TOKEN" \
             "$BASE/compose/$VERSION/compose-$VERSION.module")
           if [ "$code" = "200" ]; then
             echo "::error::$VERSION is already published. Bump TWINLIVES in Versions.kt."
@@ -67,7 +69,7 @@ jobs:
           missing=0
           for a in compose compose-android compose-iosarm64 compose-iossimulatorarm64 \
                    compose-desktop compose-js compose-wasm-js; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' -u "x:$GITHUB_TOKEN" \
+            code=$(curl -sL -o /dev/null -w '%{http_code}' -u "x:$GITHUB_TOKEN" \
               "$BASE/$a/$VERSION/$a-$VERSION.module")
             echo "  $a: HTTP $code" >> "$GITHUB_STEP_SUMMARY"
             [ "$code" = "200" ] || { echo "::error::$a is missing from $VERSION"; missing=1; }
