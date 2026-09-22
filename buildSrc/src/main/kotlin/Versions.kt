@@ -24,5 +24,5 @@ object Versions {
    * `"$VICO-$TWINLIVES"`, so it always names the upstream release it is built from. [VICO] is
    * upstream’s and arrives by merge; bump this one, and only this one, for our own releases.
    */
-  const val TWINLIVES = "1.0.1"
+  const val TWINLIVES = "1.0.2"
 }
